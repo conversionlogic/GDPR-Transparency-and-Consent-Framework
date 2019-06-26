@@ -34,13 +34,89 @@
 				};
 				cmp.config = {
 					customPurposeListLocation: 'docs/purposes.json',
-					globalConsentLocation: 'docs/portal.html'
+					globalConsentLocation: 'docs/portal.html',
+					logging: true,
 				};
 				return cmp;
 			}());
 		})(window);
 
 		__cmp('showConsentTool');
+
+		// open question on purposeConsents https://github.com/appnexus/cmp/issues/135
+		// i think the purposes are global, you can't specify per vendor purposes
+
+		// hosted reference implementation of IAB's TCF
+		// http://assetscdn.jivox.com/readcmp_vendor_v1.html
+
+
+		// CL will be a user of CMPs and the implementation guidelines are outlined here
+		// https://github.com/conversionlogic/GDPR-Transparency-and-Consent-Framework/blob/master/v1.1%20Implementation%20Guidelines.md#cmp-user-guidelines-vendors-using-cmps-
+
+
+		// we need to register for IAB's global vendor list to get this ID
+		var CL_VENDOR_ID = 1234;
+		// we'll need to figure out which purpose(s) we need
+		var CL_PURPOSE = 1;
+
+		var loadConversionLogic = function () {
+			 //CL JS tag should only fire when cmpReady and consent is given
+			;(function(p,l,o,w,i,n,g){if(!p[i]){p.GlobalConversionLogicNamespace=p.GlobalConversionLogicNamespace||[];
+				p.GlobalConversionLogicNamespace.push(i);p[i]=function(){(p[i].q=p[i].q||[]).push(arguments)
+				};p[i].q=p[i].q||[];n=l.createElement(o);g=l.getElementsByTagName(o)[0];n.async=1;
+				n.src=w;g.parentNode.insertBefore(n,g)}}(window,document,"script","../dist/staticDemo/snowplow.js","conversionlogic"));
+
+			window.conversionlogic('init', {
+				collectorUrl: 'test.conversionlogic.net',
+				advertiserId: 'staticDemo',
+				//advertiserCookieDomain: 'proactiv.com',
+				referrerUrl: 'http://proactiv.com/override-referrer',
+				customUrl: 'http://proactiv.com/override-url',
+				firstPartyCookieList: ['_ga', 'foo'],
+			});
+
+			window.conversionlogic('view');
+			window.conversionlogic('conversion', {
+				foo: 1,
+				edgar: 'hi',
+				conversionType: 'order'
+			});
+		};
+
+		// these listeners will fire immediately if event already occurred
+		// so don't need to worry about missing the event so long as the CMP is properly being
+		// loaded onto the page by publisher
+		window.__cmp('addEventListener', 'cmpReady', function(result) {
+			window.__cmp('getVendorConsents', [CL_VENDOR_ID], function(result) {
+
+				if (
+					result.gdprApplies &&
+					result.vendorConsents[CL_VENDOR_ID] &&
+					result.purposeConsents[CL_PURPOSE]
+				) {
+					loadConversionLogic();
+				}
+
+			});
+		});
+
+		// should invoke when user just provided consent via a consent popup
+		window.__cmp('addEventListener', 'onSubmit', function(result) {
+			// prob should delay the call to get updated consent so that changes did get persisted
+			setTimeout(() => {
+				// should look up current list of vendor consents
+				window.__cmp('getVendorConsents', [CL_VENDOR_ID], function(result) {
+					if (
+						result.gdprApplies &&
+						result.vendorConsents[CL_VENDOR_ID] &&
+						result.purposeConsents[CL_PURPOSE]
+					) {
+						loadConversionLogic();
+					}
+				});
+			}, 50)
+		});
+
 	</script>
 </head>
 <body>
